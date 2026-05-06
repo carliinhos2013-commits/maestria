@@ -1,0 +1,78 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitives
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+
+    // Validation Blueprint: UserStats
+    function isValidUserStats(data) {
+      return data.keys().hasAll(['userId', 'streak', 'weeklyProgress', 'userLevel', 'suggestedFocus', 'createdAt', 'updatedAt'])
+        && data.keys().size() == 7
+        && data.userId is string && data.userId == request.auth.uid
+        && data.streak is number
+        && data.weeklyProgress is number
+        && data.userLevel is string && data.userLevel in ['Iniciante', 'Intermediário', 'Avançado']
+        && data.suggestedFocus is string && data.suggestedFocus.size() <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      
+      allow create: if isOwner(userId) 
+        && isValidId(userId)
+        && isValidUserStats(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+        
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && incoming().diff(existing()).affectedKeys().hasOnly(['streak', 'weeklyProgress', 'userLevel', 'suggestedFocus', 'updatedAt'])
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().streak is number
+        && incoming().weeklyProgress is number
+        && incoming().userLevel is string && incoming().userLevel in ['Iniciante', 'Intermediário', 'Avançado']
+        && incoming().suggestedFocus is string && incoming().suggestedFocus.size() <= 100;
+        
+      allow delete: if false;
+    }
+
+    // Validation Blueprint: Court
+    function isValidCourt(data) {
+      return data.keys().hasAll(['name', 'address', 'rating', 'img', 'createdBy', 'createdAt'])
+        && data.keys().size() == 6
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.address is string && data.address.size() > 0 && data.address.size() <= 200
+        && data.rating is number && data.rating >= 0 && data.rating <= 5
+        && data.img is string && data.img.size() <= 2000
+        && data.createdBy is string && data.createdBy == request.auth.uid
+        && data.createdAt is timestamp;
+    }
+
+    match /courts/{courtId} {
+      allow read: if isSignedIn(); // We want users to see courts but we should enforce isSignedIn to prevent scraping.
+      allow list: if isSignedIn(); // Any authenticated user can list courts. (Note: no secure resource boundary check since courts are public for all users, but still gated by auth)
+      
+      allow create: if isSignedIn()
+        && isValidId(courtId)
+        && isValidCourt(incoming())
+        && incoming().createdAt == request.time;
+        
+      allow update: if false; // For now courts are immutable.
+      allow delete: if false;
+    }
+  }
+}

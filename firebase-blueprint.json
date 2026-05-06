@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "UserStats": {
+      "title": "UserStats",
+      "description": "User progress and streak data",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "streak": { "type": "number" },
+        "weeklyProgress": { "type": "number" },
+        "userLevel": { "type": "string", "enum": ["Iniciante", "Intermediário", "Avançado"] },
+        "suggestedFocus": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "streak", "weeklyProgress", "userLevel", "suggestedFocus", "createdAt", "updatedAt"]
+    },
+    "Court": {
+      "title": "Court",
+      "description": "A basketball court",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "rating": { "type": "number" },
+        "img": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["name", "address", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/UserStats" },
+      "description": "User stats and profile data"
+    },
+    "courts/{courtId}": {
+      "schema": { "$ref": "#/entities/Court" },
+      "description": "Basketball courts added by users"
+    }
+  }
+}
