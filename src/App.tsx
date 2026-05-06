@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Target, MapPin, TrendingUp, User, ChevronLeft, Info, Activity, Layers, Crosshair, Zap, MousePointerClick, ShieldCheck, Flame, Trophy, PlayCircle, Star, Navigation, Heart, Plus, Users, Search, X, Image as ImageIcon, Bell, Award, Medal, CalendarSync, LogOut, LogIn } from 'lucide-react';
+import { Home, Target, MapPin, TrendingUp, User, ChevronLeft, Info, Activity, Layers, Crosshair, Zap, MousePointerClick, ShieldCheck, Flame, Trophy, PlayCircle, Star, Navigation, Heart, Plus, Users, Search, X, Image as ImageIcon, Bell, Award, Medal, CalendarSync, LogOut, LogIn, Edit2 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db } from './firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { doc, setDoc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
 
 enum OperationType {
   CREATE = 'create',
@@ -128,53 +130,87 @@ const InicioScreen = ({
   streak, 
   weeklyProgress,
   userLevel,
-  suggestedFocus
+  suggestedFocus,
+  userName,
+  onUpdateUserName
 }: { 
   onStartWorkout: () => void, 
   streak: number, 
   weeklyProgress: number,
   userLevel: string,
-  suggestedFocus: string
-}) => (
-  <div className="p-6 pt-12 h-full flex flex-col overflow-y-auto pb-24">
-    <div className="flex justify-between items-center mb-8">
-      <div>
-        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Bem-vindo(a) de volta,</p>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tighter">Jogador</h1>
-      </div>
-      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center border-2 border-slate-200 text-slate-600">
-        <User size={24} strokeWidth={2.5} />
-      </div>
-    </div>
+  suggestedFocus: string,
+  userName: string,
+  onUpdateUserName: (name: string) => void
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempName, setTempName] = useState(userName);
 
-    {streak === 0 && (
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 bg-rose-50 border border-rose-100 rounded-[1.5rem] p-4 flex items-start gap-4">
-        <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center flex-shrink-0 text-rose-500">
-          <CalendarSync size={20} strokeWidth={2.5} />
-        </div>
-        <div className="pt-0.5">
-          <h4 className="text-sm font-black text-slate-900 tracking-tight">Cuidado com o ritmo!</h4>
-          <p className="text-xs text-rose-600 font-medium leading-tight mt-1">Você está há 2 dias sem treinar. Vamos voltar à quadra e recuperar sua sequência?</p>
-        </div>
-      </motion.div>
-    )}
+  const handleSave = () => {
+    if (tempName.trim()) {
+      onUpdateUserName(tempName.trim());
+    }
+    setIsEditing(false);
+  };
 
-    <div className="grid grid-cols-2 gap-4 mb-8">
-      <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100 flex flex-col justify-between h-28">
-        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sequência</p>
-        <div className="flex items-end gap-1">
-          <span className="text-4xl font-black text-[#1E5EFF] leading-none">{streak}</span>
-          <Flame size={24} className={cn("ml-1 mb-1", streak > 0 ? "text-[#1E5EFF] fill-[#1E5EFF]" : "text-slate-300 fill-slate-300")} strokeWidth={2.5} />
+  return (
+    <div className="p-6 pt-12 h-full flex flex-col overflow-y-auto pb-24">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Bem-vindo(a) de volta,</p>
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <input 
+                type="text" 
+                value={tempName}
+                onChange={(e) => setTempName(e.target.value)}
+                onBlur={handleSave}
+                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                autoFocus
+                className="text-2xl font-black text-slate-900 tracking-tighter bg-slate-50 border-b-2 border-[#1E5EFF] focus:outline-none w-48"
+              />
+            ) : (
+              <>
+                <h1 className="text-2xl font-black text-slate-900 tracking-tighter">{userName}</h1>
+                <button onClick={() => setIsEditing(true)} aria-label="Editar nome" className="text-slate-300 hover:text-[#1E5EFF] transition-colors mt-1 rounded-full p-1">
+                  <Edit2 size={16} strokeWidth={3} />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center border-2 border-slate-200 text-slate-600">
+          <User size={24} strokeWidth={2.5} />
         </div>
       </div>
-      <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100 flex flex-col justify-between h-28">
-        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Esta Semana</p>
-        <div className="flex items-end gap-1">
-          <span className="text-4xl font-black text-slate-900 leading-none">{weeklyProgress}</span>
-          <span className="text-xl font-black text-slate-400 mb-0.5">/5</span>
+
+      {streak === 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 bg-rose-50 border border-rose-100 rounded-[1.5rem] p-4 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center flex-shrink-0 text-rose-500">
+            <CalendarSync size={20} strokeWidth={2.5} />
+          </div>
+          <div className="pt-0.5">
+            <h4 className="text-sm font-black text-slate-900 tracking-tight">Cuidado com o ritmo!</h4>
+            <p className="text-xs text-rose-600 font-medium leading-tight mt-1">Você está há 2 dias sem treinar. Vamos voltar à quadra e recuperar sua sequência?</p>
+          </div>
+        </motion.div>
+      )}
+
+      <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100 flex flex-col justify-between h-28">
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sequência</p>
+          <div className="flex items-end gap-1">
+            <span className="text-4xl font-black text-[#1E5EFF] leading-none">{streak}</span>
+            <Flame size={24} className={cn("ml-1 mb-1", streak > 0 ? "text-[#1E5EFF] fill-[#1E5EFF]" : "text-slate-300 fill-slate-300")} strokeWidth={2.5} />
+          </div>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100 flex flex-col justify-between h-28">
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Esta Semana</p>
+          <div className="flex items-end gap-1">
+            <span className="text-4xl font-black text-slate-900 leading-none">{weeklyProgress}</span>
+            <span className="text-xl font-black text-slate-400 mb-0.5">/5</span>
+          </div>
         </div>
       </div>
-    </div>
 
     <div className="mb-8">
       <div className="flex justify-between items-end mb-4">
@@ -217,13 +253,14 @@ const InicioScreen = ({
            <h3 className="text-sm font-black text-slate-900 tracking-tighter">Exercícios de Drible</h3>
            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Você tem focado em arremesso</p>
          </div>
-         <button className="w-10 h-10 bg-slate-50 flex items-center justify-center rounded-full text-slate-900 hover:bg-slate-100 transition-colors border border-slate-200">
+         <button aria-label="Adicionar Exercícios de Drible" className="w-10 h-10 bg-slate-50 flex items-center justify-center rounded-full text-slate-900 hover:bg-slate-100 transition-colors border border-slate-200">
            <PlayCircle size={20} strokeWidth={2.5} />
          </button>
       </div>
     </div>
   </div>
-);
+  );
+};
 
 interface Court {
   id: string;
@@ -232,15 +269,15 @@ interface Court {
   rating: number;
   address: string;
   crowd: 'Leve' | 'Médio' | 'Cheio';
-  top: string;
-  left: string;
+  lat: number;
+  lng: number;
   img: string;
 }
 
 const mockCourts: Court[] = [
-  { id: '1', name: 'Parque Ibirapuera', distance: '1.2 km', rating: 4.8, address: 'Av. Pedro Álvares Cabral - Vila Mariana', crowd: 'Cheio', top: '55%', left: '35%', img: 'https://images.unsplash.com/photo-1542652694-40abf526446e?auto=format&fit=crop&q=80&w=600&h=400' },
-  { id: '2', name: 'Sesc Pinheiros', distance: '3.5 km', rating: 4.5, address: 'R. Pais Leme, 195 - Pinheiros', crowd: 'Médio', top: '75%', left: '75%', img: 'https://images.unsplash.com/photo-1504450758481-7338eba7524a?auto=format&fit=crop&q=80&w=600&h=400' },
-  { id: '3', name: 'Praça Roosevelt', distance: '5.0 km', rating: 4.2, address: 'Praça Franklin Roosevelt - Consolação', crowd: 'Leve', top: '25%', left: '60%', img: 'https://images.unsplash.com/photo-1511067007302-3f14652431cb?auto=format&fit=crop&q=80&w=600&h=400' },
+  { id: '1', name: 'Parque Ibirapuera', distance: '1.2 km', rating: 4.8, address: 'Av. Pedro Álvares Cabral - Vila Mariana', crowd: 'Cheio', lat: -23.5874, lng: -46.6576, img: 'https://images.unsplash.com/photo-1542652694-40abf526446e?auto=format&fit=crop&q=80&w=600&h=400' },
+  { id: '2', name: 'Sesc Pinheiros', distance: '3.5 km', rating: 4.5, address: 'R. Pais Leme, 195 - Pinheiros', crowd: 'Médio', lat: -23.5682, lng: -46.6975, img: 'https://images.unsplash.com/photo-1504450758481-7338eba7524a?auto=format&fit=crop&q=80&w=600&h=400' },
+  { id: '3', name: 'Praça Roosevelt', distance: '5.0 km', rating: 4.2, address: 'Praça Franklin Roosevelt - Consolação', crowd: 'Leve', lat: -23.5484, lng: -46.6477, img: 'https://images.unsplash.com/photo-1511067007302-3f14652431cb?auto=format&fit=crop&q=80&w=600&h=400' },
 ];
 
 const AbstractMapPattern = () => (
@@ -280,10 +317,10 @@ const CourtDetailsScreen = ({ court, onClose }: { court: Court, onClose: () => v
       <div className="h-[40%] relative w-full bg-slate-200 flex-shrink-0">
         <img src={court.img} alt={court.name} className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
-        <button onClick={onClose} className="absolute top-12 left-6 w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/30 hover:bg-white/30 transition-colors">
+        <button onClick={onClose} aria-label="Voltar" className="absolute top-12 left-6 w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/30 hover:bg-white/30 transition-colors">
           <ChevronLeft size={24} strokeWidth={2.5} />
         </button>
-        <button className="absolute top-12 right-6 w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/30 hover:bg-white/30 transition-colors">
+        <button aria-label="Favoritar Quadra" className="absolute top-12 right-6 w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/30 hover:bg-white/30 transition-colors">
           <Heart size={20} strokeWidth={2.5} />
         </button>
       </div>
@@ -329,7 +366,7 @@ const AddCourtScreen = ({ onClose }: { onClose: () => void }) => {
     <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="absolute inset-0 bg-white z-[60] flex flex-col pt-12 px-6 pb-12">
       <header className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-black text-slate-900 tracking-tighter">Nova Quadra</h1>
-        <button onClick={onClose} className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors">
+        <button onClick={onClose} aria-label="Fechar" className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors">
           <X size={20} strokeWidth={2.5} />
         </button>
       </header>
@@ -366,25 +403,55 @@ const QuadrasScreen = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [activePin, setActivePin] = useState<string | null>('1');
 
+  // Custom leafet icon creation using ReactDOMServer is generally needed for complex SVGs, 
+  // but we can also use basic divIcons for tailwind.
+  const createMapIcon = (isActive: boolean) => L.divIcon({
+    className: 'bg-transparent border-none shadow-none',
+    html: `<div class="relative flex items-center justify-center w-10 h-10 rounded-xl shadow-lg border-2 transition-transform ${isActive ? 'bg-[#1E5EFF] border-white text-white scale-110 z-20' : 'bg-white border-[#1E5EFF] text-[#1E5EFF] scale-100 z-10 hover:scale-105'}">
+            <svg viewBox="0 0 100 100" fill="none" class="w-6 h-6" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="25" stroke="currentColor" stroke-width="4"/>
+                <path d="M35 35 L65 65 M65 35 L35 65" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                <path d="M25 50 A20 20 0 0 1 75 50" stroke="currentColor" stroke-width="4"/>
+                <path d="M25 40 L15 30 M25 60 L15 70" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+            </svg>
+            <div class="absolute -bottom-1.5 w-3 h-3 rotate-45 border-r-2 border-b-2 ${isActive ? 'bg-[#1E5EFF] border-white' : 'bg-white border-[#1E5EFF]'}"></div>
+           </div>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+  });
+
   return (
     <div className="relative h-full w-full bg-white flex flex-col">
       {/* Map Top Half */}
-      <div className="relative h-[40%] bg-[#F8FAFC] border-b border-slate-100 overflow-hidden flex-shrink-0">
-         <AbstractMapPattern />
-         {mockCourts.map(court => (
-           <div 
-             key={court.id} 
-             className="absolute -translate-x-1/2 -translate-y-full cursor-pointer" 
-             style={{ top: court.top, left: court.left }} 
-             onClick={() => setActivePin(court.id)}
-           >
-             <CustomMapPin active={activePin === court.id} />
-           </div>
-         ))}
+      <div className="relative h-[40%] bg-[#F8FAFC] border-b border-slate-100 overflow-hidden flex-shrink-0 z-0">
+        <MapContainer center={[-23.5505, -46.6333]} zoom={11} zoomControl={false} className="w-full h-full">
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          />
+          {mockCourts.map(court => (
+            <Marker 
+              key={court.id}
+              position={[court.lat, court.lng]}
+              icon={createMapIcon(activePin === court.id)}
+              eventHandlers={{
+                click: () => {
+                  setActivePin(court.id);
+                  setSelectedCourt(court);
+                }
+              }}
+            >
+              <Popup className="font-sans font-bold text-slate-800">
+                {court.name}
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
       </div>
 
       {/* List Bottom Half */}
-      <div className="flex-1 overflow-y-auto px-6 pt-6 pb-24 bg-white">
+      <div className="flex-1 overflow-y-auto px-6 pt-6 pb-24 bg-white relative z-10">
         <div className="flex justify-between items-center mb-6">
           <div>
              <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Quadras</h2>
@@ -392,6 +459,7 @@ const QuadrasScreen = () => {
           </div>
           <button 
             onClick={() => setIsAdding(true)} 
+            aria-label="Adicionar quadra"
             className="w-12 h-12 bg-[#1E5EFF] text-white rounded-[1rem] flex items-center justify-center shadow-lg shadow-blue-200 hover:scale-105 transition-transform"
           >
              <Plus size={24} strokeWidth={3} />
@@ -402,7 +470,7 @@ const QuadrasScreen = () => {
           {mockCourts.map(court => (
             <div 
               key={court.id} 
-              onClick={() => setSelectedCourt(court)} 
+              onClick={() => { setActivePin(court.id); setSelectedCourt(court); }} 
               className={cn(
                 "bg-white border-2 p-3 rounded-[1.5rem] flex items-center gap-4 transition-colors cursor-pointer", 
                 activePin === court.id ? "border-[#1E5EFF]" : "border-slate-100 hover:border-slate-200"
@@ -644,14 +712,14 @@ const TrainingDetailsScreen = ({ data, onBack }: { key?: string, data: TrainingC
       {/* Header */}
       <header className="px-6 flex items-start justify-between mb-8 relative">
         <div className="flex flex-col z-10 w-2/3">
-          <button onClick={onBack} className="p-2 -ml-2 mb-2 text-slate-900 hover:bg-slate-100 rounded-full transition-colors w-fit">
+          <button onClick={onBack} aria-label="Voltar" className="p-2 -ml-2 mb-2 text-slate-900 hover:bg-slate-100 rounded-full transition-colors w-fit">
             <ChevronLeft size={28} strokeWidth={2.5} />
           </button>
           <h1 className="text-4xl font-black tracking-tighter leading-none text-slate-900 mb-2">{data.title}</h1>
           <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">{data.subtitle}</p>
         </div>
         <div className="absolute right-6 top-0 flex flex-col items-end">
-          <button className="text-[#1E5EFF] p-2 hover:bg-blue-50 rounded-full transition-colors">
+          <button aria-label="Informações" className="text-[#1E5EFF] p-2 hover:bg-blue-50 rounded-full transition-colors">
             <Info size={24} strokeWidth={2.5} />
           </button>
           <div className="text-[#1E5EFF] mt-2 pr-2">
@@ -722,15 +790,25 @@ const TrainingDetailsScreen = ({ data, onBack }: { key?: string, data: TrainingC
 
 // --- Workout Screens ---
 
-const WorkoutScreen = ({ onFinish, onCancel }: { key?: string, onFinish: () => void, onCancel: () => void }) => {
-  const [secondsLeft, setSecondsLeft] = React.useState(15 * 60);
+const WorkoutScreen = ({ focus, onFinish, onCancel }: { key?: string, focus: string, onFinish: (timeElapsed: number) => void, onCancel: () => void }) => {
+  const INITIAL_TIME = 15 * 60;
+  const [secondsLeft, setSecondsLeft] = React.useState(INITIAL_TIME);
   const [isPaused, setIsPaused] = React.useState(false);
 
   React.useEffect(() => {
     if (isPaused || secondsLeft <= 0) return;
-    const t = setInterval(() => setSecondsLeft(prev => prev - 1), 1000);
+    const t = setInterval(() => {
+      setSecondsLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(t);
+          onFinish(INITIAL_TIME);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
     return () => clearInterval(t);
-  }, [isPaused, secondsLeft]);
+  }, [isPaused, secondsLeft, onFinish, INITIAL_TIME]);
 
   const formatTime = (totalSeconds: number) => {
     const m = Math.floor(totalSeconds / 60);
@@ -745,42 +823,43 @@ const WorkoutScreen = ({ onFinish, onCancel }: { key?: string, onFinish: () => v
       exit={{ opacity: 0, y: 100 }}
       className="absolute inset-0 bg-slate-900 z-[60] flex flex-col justify-between pt-16 px-6 pb-12 text-white"
     >
-      <div className="flex justify-between items-center w-full">
-         <button onClick={onCancel} className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
+      <div className={cn("absolute inset-0 bg-black/50 pointer-events-none transition-opacity duration-500", isPaused ? "opacity-100 ease-in" : "opacity-0 ease-out z-[-1]")}></div>
+      <div className="flex justify-between items-center w-full relative z-20">
+         <button onClick={onCancel} aria-label="Voltar" className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
             <ChevronLeft size={28} strokeWidth={2.5} />
          </button>
          <div className="flex items-center gap-2">
             <Activity className="text-[#1E5EFF]" size={20} />
-            <span className="text-xs font-bold tracking-widest uppercase text-slate-400">Em Execução</span>
+            <span className="text-xs font-bold tracking-widest uppercase text-slate-400">{isPaused ? 'Pausado' : 'Em Execução'}</span>
          </div>
          <div className="w-10"></div>
       </div>
 
-      <div className="flex flex-col items-center flex-1 justify-center relative">
+      <div className="flex flex-col items-center flex-1 justify-center relative z-20">
          <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
-           <div className="w-64 h-64 border-[4px] border-[#1E5EFF] rounded-full animate-ping" style={{ animationDuration: '3s' }}></div>
+           {!isPaused && <div className="w-64 h-64 border-[4px] border-[#1E5EFF] rounded-full animate-ping" style={{ animationDuration: '3s' }}></div>}
            <div className="absolute w-80 h-80 border-[2px] border-[#1E5EFF] rounded-full"></div>
          </div>
          
-         <h2 className="text-2xl font-black tracking-tighter text-center mb-8 relative z-10">Arremesso Parado</h2>
-         <div className="text-[5rem] font-black tracking-tighter text-white tabular-nums leading-none mb-8 relative z-10">
+         <h2 className="text-2xl font-black tracking-tighter text-center mb-8 relative z-10">Fundamentos de {focus}</h2>
+         <div className={cn("text-[5rem] font-black tracking-tighter text-white tabular-nums leading-none mb-8 relative z-10 transition-opacity", isPaused ? "opacity-50 animate-pulse" : "opacity-100")}>
            {formatTime(secondsLeft)}
          </div>
          <p className="text-center text-slate-400 max-w-xs text-sm font-medium relative z-10">
-           Mantenha o cotovelo alinhado e flexione os joelhos. Foco na execução perfeita.
+           Mantenha o foco na execução perfeita. Respire fundo e siga o ritmo.
          </p>
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 relative z-20">
         <button 
           onClick={() => setIsPaused(!isPaused)} 
-          className="w-full bg-slate-800 text-white font-bold py-4 rounded-2xl shadow-sm border border-slate-700"
+          className="w-full bg-slate-800 text-white font-bold py-4 rounded-2xl shadow-sm border border-slate-700 hover:bg-slate-700 transition-colors"
         >
           {isPaused ? 'CONTINUAR' : 'PAUSAR'}
         </button>
         <button 
-          onClick={onFinish} 
-          className="w-full bg-[#1E5EFF] text-white font-bold py-4 rounded-2xl shadow-sm"
+          onClick={() => onFinish(INITIAL_TIME - secondsLeft)} 
+          className="w-full bg-[#1E5EFF] text-white font-bold py-4 rounded-2xl shadow-sm hover:bg-blue-600 transition-colors"
         >
           FINALIZAR TREINO
         </button>
@@ -789,8 +868,14 @@ const WorkoutScreen = ({ onFinish, onCancel }: { key?: string, onFinish: () => v
   );
 };
 
-const WorkoutFeedbackScreen = ({ onComplete, focus, level }: { key?: string, onComplete: (rating: string) => void, focus: string, level: string }) => {
+const WorkoutFeedbackScreen = ({ onComplete, focus, level, timeElapsed }: { key?: string, onComplete: (rating: string) => void, focus: string, level: string, timeElapsed: number }) => {
   const [selectedRating, setSelectedRating] = React.useState<string | null>(null);
+
+  const formatTime = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   return (
     <motion.div 
@@ -809,7 +894,8 @@ const WorkoutFeedbackScreen = ({ onComplete, focus, level }: { key?: string, onC
         <div className="w-full p-6 bg-slate-50 border border-slate-100 rounded-[2rem] flex flex-col items-center mb-8">
           <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-4">Resumo do Treino</p>
           <h3 className="text-2xl font-black text-slate-900 tracking-tighter mb-1 uppercase text-center">Fundamentos de {focus}</h3>
-          <p className="text-sm text-[#1E5EFF] font-black uppercase tracking-widest mb-6">Nível {level}</p>
+          <p className="text-sm text-[#1E5EFF] font-black uppercase tracking-widest mb-2">Nível {level}</p>
+          <p className="text-xs text-slate-500 font-bold mb-6">TEMPO TREINADO: {formatTime(timeElapsed)}</p>
           
           <div className="w-full mt-2">
              <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-3 text-center">Como foi seu desempenho?</p>
@@ -839,7 +925,7 @@ const WorkoutFeedbackScreen = ({ onComplete, focus, level }: { key?: string, onC
         )}
         disabled={!selectedRating}
       >
-        Continuar e Salvar
+        Voltar ao Início
       </button>
     </motion.div>
   );
@@ -916,6 +1002,7 @@ export default function App() {
   const [user] = useAuthState(auth);
   const [activeTab, setActiveTab] = useState('inicio');
   const [workoutState, setWorkoutState] = useState<'idle' | 'running' | 'feedback'>('idle');
+  const [timeElapsed, setTimeElapsed] = useState(0);
   // Forcing streak 0 initially to show notification example
   const [streak, setStreak] = useState(0);
   const [weeklyProgress, setWeeklyProgress] = useState(3);
@@ -923,6 +1010,18 @@ export default function App() {
   // Intelligent Adaptation State
   const [userLevel, setUserLevel] = useState<'Iniciante' | 'Intermediário' | 'Avançado'>('Iniciante');
   const [suggestedFocus, setSuggestedFocus] = useState('Arremesso');
+
+  // Username State
+  const [localName, setLocalName] = useState(() => {
+    return localStorage.getItem('maestria_username') || 'Jogador';
+  });
+
+  const handleUpdateUserName = (newName: string) => {
+    setLocalName(newName);
+    localStorage.setItem('maestria_username', newName);
+  };
+
+  const displayUserName = user?.displayName || localName;
 
   // Firebase DB Sync
   useEffect(() => {
@@ -955,7 +1054,8 @@ export default function App() {
     }
   }, [user]);
 
-  const handleFinishWorkout = () => {
+  const handleFinishWorkout = (elapsed: number) => {
+    setTimeElapsed(elapsed);
     setWorkoutState('feedback');
   };
 
@@ -1023,6 +1123,8 @@ export default function App() {
                 weeklyProgress={weeklyProgress}
                 userLevel={userLevel}
                 suggestedFocus={suggestedFocus}
+                userName={displayUserName}
+                onUpdateUserName={handleUpdateUserName}
               />
             </motion.div>
           )}
@@ -1055,6 +1157,7 @@ export default function App() {
         {workoutState === 'running' && (
           <WorkoutScreen 
             key="workout-screen"
+            focus={suggestedFocus}
             onFinish={handleFinishWorkout}
             onCancel={() => setWorkoutState('idle')}
           />
@@ -1065,6 +1168,7 @@ export default function App() {
             onComplete={handleCompleteFeedback}
             focus={suggestedFocus}
             level={userLevel}
+            timeElapsed={timeElapsed}
           />
         )}
       </AnimatePresence>
